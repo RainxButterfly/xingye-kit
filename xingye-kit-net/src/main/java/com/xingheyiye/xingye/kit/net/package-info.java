@@ -26,9 +26,14 @@
  *       自带建造者式 API）与 {@link com.xingheyiye.xingye.kit.net.HttpResponse}
  *       （不可变响应，网络错误以 {@link com.xingheyiye.xingye.kit.net.HttpErrorType} 表达而非异常）；</li>
  *   <li>执行器：{@link com.xingheyiye.xingye.kit.net.HttpTool} 基于 HttpURLConnection 实现，
- *       内置手动重定向跟随、gzip 自动解压、超时区分、指数退避重试、代理、Basic/Bearer 认证与 X-Trace-Id 追踪；</li>
- *   <li>稳定性组件：{@link com.xingheyiye.xingye.kit.net.RateLimiter}（令牌桶限流）与
- *       {@link com.xingheyiye.xingye.kit.net.CircuitBreaker}（滑动窗口熔断器）。</li>
+ *       内置手动重定向跟随、gzip 自动解压、超时区分、指数退避重试、代理、Basic/Bearer 认证与 X-Trace-Id 追踪；
+ *       契约见 {@link com.xingheyiye.xingye.kit.net.HttpClient}，实现方可自行替换；</li>
+ *   <li>稳定性组件：{@link com.xingheyiye.xingye.kit.net.RateLimiter}（令牌桶
+ *       {@link com.xingheyiye.xingye.kit.net.TokenBucketRateLimiter} / 漏桶
+ *       {@link com.xingheyiye.xingye.kit.net.LeakyBucketRateLimiter} 两种内置选择）与
+ *       {@link com.xingheyiye.xingye.kit.net.CircuitBreaker}（滑动窗口
+ *       {@link com.xingheyiye.xingye.kit.net.SlidingWindowCircuitBreaker} / 并发信号量
+ *       {@link com.xingheyiye.xingye.kit.net.ConcurrencyLimitCircuitBreaker} 两种内置选择）。</li>
  * </ul>
  *
  * <p>适用场景：中小型服务、运维工具、内部网关代理等不希望引入重量级 HTTP 客户端的场合；

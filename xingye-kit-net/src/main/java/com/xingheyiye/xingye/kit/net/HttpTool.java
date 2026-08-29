@@ -52,6 +52,10 @@ import java.util.zip.GZIPInputStream;
 /**
  * 基于 JDK 原生 HttpURLConnection 的 HTTP 执行器，把 {@link HttpRequest} 真正发送出去并产出 {@link HttpResponse}。
  *
+ * <p>本类是 {@link HttpClient} 契约的内置实现（零第三方依赖）：需要连接池、HTTP/2、
+ * 异步等重量级能力时，可自行实现 {@link HttpClient} 接口包装 OkHttp / Apache HttpClient，
+ * 业务代码面向接口不变。</p>
+ *
  * <p>适用场景：中小体积的 API 调用、简单文件上传、需要统一超时/重试/追踪的小型服务与工具程序；
  * <b>不适合超大文件下载——响应体会被完整读入内存</b>，下载数百 MB 级文件请改用流式方案。</p>
  *
@@ -89,7 +93,7 @@ import java.util.zip.GZIPInputStream;
  * @author 星河一叶 (RainxButterfly)
  * @since 2026-08-25
  */
-public final class HttpTool {
+public final class HttpTool implements HttpClient {
 
     /** 默认连接超时：5000 毫秒。 */
     private static final int DEFAULT_CONNECT_TIMEOUT_MILLIS = 5000;
