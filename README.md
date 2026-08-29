@@ -37,7 +37,7 @@
 - **零依赖**：7 个核心模块不依赖 Spring、不依赖任何第三方库，可在任何 Java 项目（包括 Android 服务端、纯后端服务、工具脚本）中直接使用
 - **全版本兼容**：源码锁定 JDK 8 语法、编译为 JDK 8 字节码，天然运行在 JDK 8 / 11 / 17 / 21 / 25 上
 - **Spring 可选**：唯一的 `xingye-kit-boot` 模块提供自动装配，同时兼容 Spring Boot 2.7.x 与 3.x，不需要 Spring 时完全不用引入
-- **接口与实现分离**：厂商类能力（短信、邮件、Redis 等）只定义契约 + 提供 JDK 默认实现，真实厂商接入由使用方按接口适配，不强绑定任何 SDK
+- **接口与实现分离**：厂商类能力（短信、邮件、Redis 等）只定义契约 + 提供 JDK 默认实现，真实厂商接入由使用方按接口适配，不强绑定任何 SDK；每个扩展点都提供多个内置选择（如限流令牌桶/漏桶、缓存淘汰 LRU/FIFO）+ 实现方自定义入口
 - **安全默认**：AES-GCM 随机 IV、PBKDF2 按 OWASP 推荐迭代数、JWT 常量时间比较、ZIP 解压防路径穿越（Zip-Slip）、日志脱敏注解
 
 ## 模块总览
@@ -47,11 +47,14 @@
 | `xingye-kit-core` | 基础核心，被其余模块依赖 | `Result`、`BizException`、`ErrorCode`、`Assert`、`StringUtils`、`DateUtils`、`StopWatch`、`RetryTemplate`、`IdGenerator`、`ClassUtils` |
 | `xingye-kit-id` | 标识生成 | `Snowflake`（时钟回拨处理）、`UuidUtils`、`ShortCode`（Base62 / 防歧义字符）、`RequestNo` |
 | `xingye-kit-notify` | 通知通信 | `Notifier`、`SmsClient`、`MailClient`、`WebhookClient`（钉钉/飞书/企业微信）、`VerificationCode`、`NotificationTemplate` |
-| `xingye-kit-net` | HTTP 与远程调用 | `HttpTool`（超时/重试/代理/上传）、`HttpRequest`、`HttpResponse`、`RateLimiter`（令牌桶）、`CircuitBreaker` |
+| `xingye-kit-net` | HTTP 与远程调用 | `HttpTool`（超时/重试/代理/上传）、`HttpRequest`、`HttpResponse`、`RateLimiter`（令牌桶 / 漏桶）、`CircuitBreaker`（滑动窗口 / 并发信号量） |
 | `xingye-kit-io` | 文件与 IO | `FileUtils`、`ZipUtils`、`CsvWriter` / `CsvReader`、`QrCodeUtils`（ZXing 可选）、`ImageUtils` |
 | `xingye-kit-cache` | 缓存 | `LocalCache`（TTL + 近似 LRU）、`RedisHelper`（前缀 key / 分布式锁 / 计数器）、`Idempotent` |
+| `xingye-kit-cache-redis` | Redis 适配（真实 Jedis 实现） | `JedisRedisClient`（实现 `RedisClient`，连接池管理） |
 | `xingye-kit-security` | 安全 | `AESUtils`（GCM）、`RSAUtils`、`HashUtils`（SHA/HMAC/PBKDF2）、`JwtWrapper`（HS256/384/512、RS256）、`SensitiveMask` |
 | `xingye-kit-boot` | Spring Boot 自动装配（唯一含 Spring 依赖的模块） | `XingyeKitAutoConfiguration` 及 http / id / cache / notification 四组装配 |
+| `xingye-kit-sms-aliyun` | 阿里云短信适配（真实发送模板短信） | `AliyunSmsClient`（实现 `SmsClient`） |
+| `xingye-kit-mail` | 邮件适配（SMTP 真实发送） | `JavaMailClient`（实现 `MailClient`，纯文本 / HTML / 附件） |
 
 ## 环境要求
 
@@ -98,7 +101,7 @@
 </dependency>
 ```
 
-> 版本号对应 GitHub 的 Tag：先在仓库打 tag（如 `v1.0.0`），首次引入时 JitPack 自动拉取构建，约需 1~2 分钟。聚合坐标会引入全部 8 个模块（`boot` 的 Spring 依赖为 `provided`，不会传递引入，不影响非 Spring 项目）。
+> 版本号对应 GitHub 的 Tag：先在仓库打 tag（如 `v1.0.0`），首次引入时 JitPack 自动拉取构建，约需 1~2 分钟。聚合坐标会引入全部 11 个模块（`boot` 的 Spring 依赖为 `provided`，不会传递引入，不影响非 Spring 项目；`sms-aliyun` 的阿里云 SDK、`mail` 的 JavaMail、`cache-redis` 的 Jedis 仅在引入对应适配模块时才会传递进来）。
 
 **方式 B：源码构建安装到本地仓库 / 私服**
 
@@ -224,12 +227,15 @@ if (resp.isSuccess()) {
     System.out.println(resp.getBodyText() + " / " + resp.getElapsedMillis() + "ms");
 }
 
-// 令牌桶：每秒 100 个令牌，突发容量 200
-RateLimiter limiter = new RateLimiter(100, 200);
+// 令牌桶：每秒 100 个令牌，突发容量 200（允许瞬间突发）
+RateLimiter limiter = new TokenBucketRateLimiter(100.0d, 200L);
 if (limiter.tryAcquire()) { /* 放行 */ }
 
+// 漏桶：恒速 100 QPS，桶容量 200，输出平滑（限制在途并发）
+RateLimiter smooth = new LeakyBucketRateLimiter(100.0d, 200L);
+
 // 熔断器：窗口 20 次，失败率 >= 50% 熔断 30s，半开放行 1 个试探请求
-CircuitBreaker breaker = new CircuitBreaker("order-query", 20, 0.5, 30000, 1);
+CircuitBreaker breaker = new SlidingWindowCircuitBreaker("order-query", 20, 0.5, 30000, 1);
 if (breaker.allowRequest()) {
     try {
         callRemote();
@@ -238,20 +244,45 @@ if (breaker.allowRequest()) {
         breaker.recordFailure();
     }
 }
+
+// 并发信号量熔断：在途最多 50 个并发请求，超限快速失败（限流/熔断可自行实现接口接入自定义策略）
+CircuitBreaker concurrency = new ConcurrencyLimitCircuitBreaker("pay-service", 50);
 ```
 
 ### notify —— 验证码 / Webhook
 
 ```java
-// 验证码：60s 有效、60s 防重发、错 5 次作废
+// 验证码：60s 有效、60s 防重发、错 5 次作废（纯数字，默认策略）
 VerificationCode code = new VerificationCode(new InMemoryCodeStore());
 String target = "13800138000";
 code.generate(target);   // 内部生成并存储，60s 内重复生成抛 IllegalStateException
 boolean ok = code.verify(target, userInput);   // 一次性校验
 
+// 自定义生成策略（如防歧义字符集）：实现 CodeGenerator 接口注入，数字/字母数字可一键切换
+VerificationCode safeCode = new VerificationCode(new InMemoryCodeStore(), 8,
+        length -> ShortCode.randomUnambiguous(length), 60000L, 60000L, 5);
+
 // 钉钉机器人
 WebhookClient dingTalk = new DingTalkWebhookClient("https://oapi.dingtalk.com/robot/send?access_token=xxx");
 SendResult sendResult = dingTalk.send("告警", "CPU 使用率超过 90%");
+
+// 阿里云短信（真实发送，需引入 xingye-kit-sms-aliyun 并配置 AccessKey）
+SmsClient aliyun = new AliyunSmsClient("LTAI...", "access-key-secret");
+SendResult sms = aliyun.send("13800138000", "星叶工具", "SMS_123456789",
+        Collections.singletonMap("code", "123456"));
+
+// SMTP 邮件（真实发送，需引入 xingye-kit-mail 并配置发件邮箱）
+MailClient mail = JavaMailClient.builder()
+        .host("smtp.example.com").port(465)
+        .username("noreply@example.com").password("smtp-auth-code")
+        .from("noreply@example.com").fromName("星叶工具箱")
+        .build();
+SendResult mailResult = mail.send(MailMessage.builder()
+        .to("user@example.com")
+        .subject("订单发货通知")
+        .content("<h3>您的订单已发货</h3>")
+        .html(true)
+        .build());
 ```
 
 ### cache —— 本地缓存 / 分布式锁 / 幂等
@@ -265,7 +296,8 @@ LocalCache<String, User> cache = LocalCache.<String, User>newBuilder()
         .build();
 User user = cache.get("user:1001", key -> loadUser(key));
 
-// 分布式锁 / 计数（RedisClient 由 Jedis/Lettuce/Redisson 适配实现）
+// 分布式锁 / 计数（RedisClient 由 Jedis/Lettuce/Redisson 适配实现；本地联调用内置内存版）
+RedisClient myRedisClient = new InMemoryRedisClient();   // 生产改为真实适配（Jedis/Lettuce/Redisson）
 RedisHelper redis = new RedisHelper(myRedisClient, "app1");
 if (redis.tryLock("order:1001", "worker-07", 30000)) {
     try { /* 临界区 */ } finally { redis.unlock("order:1001", "worker-07"); }
@@ -273,8 +305,9 @@ if (redis.tryLock("order:1001", "worker-07", 30000)) {
 // 60s 固定窗口计数
 long count = redis.nextCount("api:/pay", 60000);
 
-// 幂等：请求号去重
+// 幂等：请求号去重（单机内存版 / Redis 分布式版可切换；自定义则实现 IdempotentStore）
 Idempotent idempotent = new Idempotent(new MemoryIdempotentStore());
+// 多实例部署：Idempotent idempotent = new Idempotent(new RedisIdempotentStore(realRedisClient));
 if (!idempotent.tryBegin(requestNo, 30000)) { return Result.fail(40901, "重复请求"); }
 // ... 业务成功后 idempotent.complete(requestNo)
 ```
@@ -360,6 +393,7 @@ if (QrCodeUtils.available()) {
 | JDK | 8 | 11 | 17 | 21 | 25 |
 |---|---|---|---|---|---|
 | 核心七模块 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 厂商适配模块（sms-aliyun / mail） | ✅（SDK 均兼容 JDK 8） | ✅ | ✅ | ✅ | ✅ |
 | xingye-kit-boot | ✅（Boot 2.7.x） | ✅ | ✅（Boot 2.7.x / 3.x） | ✅（Boot 3.x） | ✅（Boot 3.x） |
 
 | Spring Boot | 2.7.x | 3.x |
@@ -402,6 +436,12 @@ xingye-kit
 ├── xingye-kit-security
 │   └── src/main/java/com/xingheyiye/xingye/kit/security
 │       └── impl (PBKDF2 密码哈希)
+├── xingye-kit-sms-aliyun
+│   └── src/main/java/com/xingheyiye/xingye/kit/sms/aliyun (AliyunSmsClient 真实发送)
+├── xingye-kit-mail
+│   └── src/main/java/com/xingheyiye/xingye/kit/mail (JavaMailClient 真实发送)
+├── xingye-kit-cache-redis
+│   └── src/main/java/com/xingheyiye/xingye/kit/cache/redis (JedisRedisClient 真实 Redis)
 └── xingye-kit-boot
     ├── src/main/java/com/xingheyiye/xingye/kit/boot
     └── src/main/resources/META-INF
