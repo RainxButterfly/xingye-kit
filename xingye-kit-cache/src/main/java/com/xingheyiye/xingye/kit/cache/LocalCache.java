@@ -18,9 +18,11 @@
  */
 package com.xingheyiye.xingye.kit.cache;
 
+import com.xingheyiye.xingye.kit.cache.impl.LruEvictionPolicy;
+
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -31,23 +33,25 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 
 /**
- * 进程内线程安全本地缓存：支持写入后过期、容量上限近似 LRU 淘汰与命中统计。
+ * 进程内线程安全本地缓存：支持写入后过期、容量上限按淘汰策略淘汰与命中统计。
  *
  * <p>适用场景：单实例服务的热点数据缓存、字典/配置缓存、通过 loader 回源防击穿；
  * 不适合跨实例共享或需要持久化的场景（请改用 Redis 等外部缓存）。</p>
  *
+ * <p>淘汰策略可插拔：默认使用近似 LRU（{@link LruEvictionPolicy}），可通过
+ * {@link Builder#evictionPolicy(EvictionPolicy)} 切换内置的 FIFO
+ * （{@code com.xingheyiye.xingye.kit.cache.impl.FifoEvictionPolicy}），
+ * 或注入自定义 {@link EvictionPolicy} 实现。过期（TTL）由 LocalCache 统一管理，与淘汰策略解耦。</p>
+ *
  * <p>线程安全性：所有公开方法线程安全，可被多线程并发调用。
  * 注意 {@code get(key, loader)} 不对相同 key 做加载去重，并发下同一 key 可能被多个线程同时回源。</p>
- *
- * <p>近似 LRU 语义：内部使用 {@link ConcurrentLinkedDeque} 维护访问顺序，命中时执行 remove + addLast；
- * 该操作在大容量下为 O(n)，且并发下顺序可能短暂漂移，因此仅作为容量淘汰的启发式依据，
- * 不保证严格 LRU。缓存条目数极大或读写极热的场景请自行评估该开销。</p>
  *
  * <p>使用示例：</p>
  * <pre>{@code
  * LocalCache<String, String> cache = LocalCache.<String, String>newBuilder()
  *         .maximumSize(2048)                    // 最大 2048 条
  *         .expireAfterWriteMillis(60000)        // 写入 60 秒后过期
+ *         .evictionPolicy(new FifoEvictionPolicy<String>())   // 可选：FIFO 淘汰；默认近似 LRU
  *         .cleanupIntervalSeconds(30)           // 后台每 30 秒清理一次
  *         .build();
  *
@@ -76,10 +80,10 @@ public final class LocalCache<K, V> {
     /** 核心存储：键 -> 缓存条目（含值与过期时刻） */
     private final ConcurrentHashMap<K, Entry<V>> store;
 
-    /** 近似 LRU 访问顺序队列：队头为最久未访问，队尾为最近访问 */
-    private final ConcurrentLinkedDeque<K> lruOrder;
+    /** 容量淘汰策略（决定超过 maximumSize 时按什么顺序淘汰），恒非 null */
+    private final EvictionPolicy<K> evictionPolicy;
 
-    /** 最大缓存条目数（条），超过后按 LRU 顺序从队头淘汰 */
+    /** 最大缓存条目数（条），超过后按淘汰策略从最应淘汰的键开始淘汰 */
     private final long maximumSize;
 
     /** 写入后过期时长（纳秒），由毫秒配置换算而来 */
@@ -101,7 +105,7 @@ public final class LocalCache<K, V> {
         this.maximumSize = builder.maximumSize;
         this.expireAfterWriteNanos = TimeUnit.MILLISECONDS.toNanos(builder.expireAfterWriteMillis);
         this.store = new ConcurrentHashMap<K, Entry<V>>();
-        this.lruOrder = new ConcurrentLinkedDeque<K>();
+        this.evictionPolicy = Objects.requireNonNull(builder.evictionPolicy, "evictionPolicy 不能为 null");
         this.stats = new CacheStats();
         this.shutdown = new AtomicBoolean(false);
         this.cleaner = Executors.newSingleThreadScheduledExecutor(new CleanerThreadFactory());
@@ -145,13 +149,13 @@ public final class LocalCache<K, V> {
             // 惰性过期：读取时发现已过期即移除，并计入过期统计
             if (store.remove(key, entry)) {
                 stats.expiredCount.increment();
-                lruOrder.remove(key);
+                evictionPolicy.onRemove(key);
             }
             stats.missCount.increment();
             return null;
         }
         stats.hitCount.increment();
-        touch(key);
+        evictionPolicy.onAccess(key);
         return entry.value;
     }
 
@@ -197,7 +201,7 @@ public final class LocalCache<K, V> {
         }
         long now = System.nanoTime();
         store.put(key, new Entry<V>(value, now + expireAfterWriteNanos));
-        touch(key);
+        evictionPolicy.onWrite(key);
         evictIfNeeded();
     }
 
@@ -211,7 +215,7 @@ public final class LocalCache<K, V> {
             return;
         }
         store.remove(key);
-        lruOrder.remove(key);
+        evictionPolicy.onRemove(key);
     }
 
     /**
@@ -219,7 +223,7 @@ public final class LocalCache<K, V> {
      */
     public void invalidateAll() {
         store.clear();
-        lruOrder.clear();
+        evictionPolicy.clear();
     }
 
     /**
@@ -268,26 +272,15 @@ public final class LocalCache<K, V> {
     }
 
     /**
-     * 将键移动到 LRU 队尾（最近访问）。
-     *
-     * <p>ConcurrentLinkedDeque 的 remove 为 O(n)，是近似 LRU 的主要代价来源。</p>
-     *
-     * @param key 缓存键
-     */
-    private void touch(K key) {
-        lruOrder.remove(key);
-        lruOrder.addLast(key);
-    }
-
-    /**
-     * 超过容量上限时按 LRU 顺序从队头淘汰，直到回到上限以内。
+     * 超过容量上限时按淘汰策略从最应淘汰的键开始淘汰，直到回到上限以内。
      */
     private void evictIfNeeded() {
         while (store.size() > maximumSize) {
-            K eldest = lruOrder.pollFirst();
+            K eldest = evictionPolicy.evictionCandidate();
             if (eldest == null) {
                 break;
             }
+            // evictionCandidate 已把键从策略内部顺序结构移除（出队），此处只需从存储表删除
             if (store.remove(eldest) != null) {
                 stats.evictionCount.increment();
             }
@@ -302,7 +295,7 @@ public final class LocalCache<K, V> {
             if (isExpired(element.getValue())) {
                 if (store.remove(element.getKey(), element.getValue())) {
                     stats.expiredCount.increment();
-                    lruOrder.remove(element.getKey());
+                    evictionPolicy.onRemove(element.getKey());
                 }
             }
         }
@@ -361,6 +354,9 @@ public final class LocalCache<K, V> {
         /** 后台清理周期（秒），默认 60 */
         private long cleanupIntervalSeconds = DEFAULT_CLEANUP_INTERVAL_SECONDS;
 
+        /** 容量淘汰策略，默认近似 LRU */
+        private EvictionPolicy<K> evictionPolicy = new LruEvictionPolicy<K>();
+
         private Builder() {
         }
 
@@ -394,6 +390,24 @@ public final class LocalCache<K, V> {
          */
         public Builder<K, V> cleanupIntervalSeconds(long cleanupIntervalSeconds) {
             this.cleanupIntervalSeconds = cleanupIntervalSeconds;
+            return this;
+        }
+
+        /**
+         * 设置容量淘汰策略。
+         *
+         * <p>默认近似 LRU；可换用内置的 FIFO
+         * （{@code new FifoEvictionPolicy<K>()}），或注入自定义 {@link EvictionPolicy} 实现。</p>
+         *
+         * @param evictionPolicy 淘汰策略，不能为 null
+         * @return 当前 Builder，便于链式调用，不会为 null
+         * @throws IllegalArgumentException evictionPolicy 为 null 时抛出
+         */
+        public Builder<K, V> evictionPolicy(EvictionPolicy<K> evictionPolicy) {
+            if (evictionPolicy == null) {
+                throw new IllegalArgumentException("evictionPolicy 不能为 null");
+            }
+            this.evictionPolicy = evictionPolicy;
             return this;
         }
 
