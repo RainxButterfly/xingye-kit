@@ -19,6 +19,7 @@
 package com.xingheyiye.xingye.kit.cache.impl;
 
 import com.xingheyiye.xingye.kit.cache.EvictionPolicy;
+import com.xingheyiye.xingye.kit.cache.LocalCache;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 
