@@ -18,6 +18,9 @@
  */
 package com.xingheyiye.xingye.kit.core;
 
+import com.xingheyiye.xingye.kit.core.impl.ExponentialBackoff;
+import com.xingheyiye.xingye.kit.core.impl.FixedBackoff;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +38,8 @@ import java.util.function.Supplier;
  * <p>重试与异常语义：
  * <ul>
  *     <li>仅当抛出的异常命中 {@link #retryOn(Class[])} 配置的类型（含子类）时才重试，其余异常立即抛出；</li>
- *     <li>重试间隔由 {@link #backoff(long)} 或 {@link #exponentialBackoff(long, double, long)} 决定，未配置则立即重试；</li>
+ *     <li>重试间隔由 {@link #backoff(long)}、{@link #exponentialBackoff(long, double, long)}
+ *         或自定义的 {@link #backoff(RetryBackoff)} 决定，未配置则立即重试；</li>
  *     <li>等待期间线程被中断时，会恢复中断标记并抛出 RuntimeException；</li>
  *     <li>重试次数耗尽后重抛最后一次异常：RuntimeException 原样抛出，其余（含 Error）包装为 RuntimeException 抛出。</li>
  * </ul>
@@ -67,36 +71,21 @@ public final class RetryTemplate {
     /** 触发重试的异常类型列表（命中任一即重试），不可变列表 */
     private final List<Class<? extends Throwable>> retryOnTypes;
 
-    /** 退避策略类型 */
-    private final Backoff backoff;
-
-    /** 首次重试前的等待毫秒数（固定策略下即每次等待时长） */
-    private final long initialMillis;
-
-    /** 指数退避倍率（每次重试在上一次基础上乘以该倍数） */
-    private final double multiplier;
-
-    /** 单次等待毫秒数上限，仅指数策略生效 */
-    private final long maxMillis;
+    /** 退避策略（决定每次失败后等待多久再重试），恒非 null */
+    private final RetryBackoff backoff;
 
     /**
      * 私有全参构造器，仅通过 {@link #create()} 与配置方法创建实例。
      *
      * @param maxAttempts 最大尝试次数，恒 >= 1
      * @param retryOnTypes 触发重试的异常类型列表，不可为 null
-     * @param backoff 退避策略类型
-     * @param initialMillis 首次等待毫秒数
-     * @param multiplier 指数倍率
-     * @param maxMillis 单次等待上限毫秒数
+     * @param backoff 退避策略，不可为 null
      */
     private RetryTemplate(int maxAttempts, List<Class<? extends Throwable>> retryOnTypes,
-                          Backoff backoff, long initialMillis, double multiplier, long maxMillis) {
+                          RetryBackoff backoff) {
         this.maxAttempts = maxAttempts;
         this.retryOnTypes = retryOnTypes;
         this.backoff = backoff;
-        this.initialMillis = initialMillis;
-        this.multiplier = multiplier;
-        this.maxMillis = maxMillis;
     }
 
     /**
@@ -105,7 +94,7 @@ public final class RetryTemplate {
      * @return 全新重试模板实例，恒不为 null
      */
     public static RetryTemplate create() {
-        return new RetryTemplate(DEFAULT_MAX_ATTEMPTS, DEFAULT_RETRY_ON, Backoff.NONE, 0L, 1.0d, 0L);
+        return new RetryTemplate(DEFAULT_MAX_ATTEMPTS, DEFAULT_RETRY_ON, new FixedBackoff(0L));
     }
 
     /**
@@ -119,7 +108,7 @@ public final class RetryTemplate {
         if (maxAttempts < 1) {
             throw new IllegalArgumentException("maxAttempts 必须 >= 1，当前: " + maxAttempts);
         }
-        return new RetryTemplate(maxAttempts, retryOnTypes, backoff, initialMillis, multiplier, maxMillis);
+        return new RetryTemplate(maxAttempts, retryOnTypes, backoff);
     }
 
     /**
@@ -142,11 +131,13 @@ public final class RetryTemplate {
             copied.add(type);
         }
         return new RetryTemplate(maxAttempts, Collections.unmodifiableList(copied),
-                backoff, initialMillis, multiplier, maxMillis);
+                backoff);
     }
 
     /**
      * 设置固定重试间隔，返回新的模板实例，原实例不变。
+     *
+     * <p>等价于 {@code backoff(new FixedBackoff(millis))}，即内置的固定间隔退避实现。</p>
      *
      * @param millis 每次重试前固定等待的毫秒数，必须 >= 0
      * @return 应用新配置的模板实例，恒不为 null
@@ -156,13 +147,32 @@ public final class RetryTemplate {
         if (millis < 0L) {
             throw new IllegalArgumentException("millis 不能为负数，当前: " + millis);
         }
-        return new RetryTemplate(maxAttempts, retryOnTypes, Backoff.FIXED, millis, 1.0d, millis);
+        return new RetryTemplate(maxAttempts, retryOnTypes, new FixedBackoff(millis));
+    }
+
+    /**
+     * 设置自定义退避策略，返回新的模板实例，原实例不变。
+     *
+     * <p>内置选择：{@code FixedBackoff}（固定间隔）与 {@code ExponentialBackoff}（指数递增）
+     * 位于 {@code com.xingheyiye.xingye.kit.core.impl} 包；需要抖动、随机或按异常区分间隔时，
+     * 自行实现 {@link RetryBackoff} 接口传入即可。</p>
+     *
+     * @param backoff 退避策略，不能为 null
+     * @return 应用新配置的模板实例，恒不为 null
+     * @throws IllegalArgumentException 当 {@code backoff} 为 {@code null} 时抛出
+     */
+    public RetryTemplate backoff(RetryBackoff backoff) {
+        if (backoff == null) {
+            throw new IllegalArgumentException("backoff 不能为 null");
+        }
+        return new RetryTemplate(maxAttempts, retryOnTypes, backoff);
     }
 
     /**
      * 设置指数退避重试间隔，返回新的模板实例，原实例不变。
      *
      * <p>第 n 次重试前等待 {@code initialMillis * multiplier^(n-1)} 毫秒，并以 {@code maxMillis} 封顶。
+     * 等价于 {@code backoff(new ExponentialBackoff(initialMillis, multiplier, maxMillis))}。</p>
      *
      * @param initialMillis 首次重试前等待的毫秒数，必须 >= 0
      * @param multiplier 每次重试的间隔倍率，必须 &gt; 0
@@ -181,8 +191,8 @@ public final class RetryTemplate {
             throw new IllegalArgumentException("maxMillis 不能小于 initialMillis，当前: maxMillis="
                     + maxMillis + ", initialMillis=" + initialMillis);
         }
-        return new RetryTemplate(maxAttempts, retryOnTypes, Backoff.EXPONENTIAL,
-                initialMillis, multiplier, maxMillis);
+        return new RetryTemplate(maxAttempts, retryOnTypes,
+                new ExponentialBackoff(initialMillis, multiplier, maxMillis));
     }
 
     /**
@@ -206,7 +216,7 @@ public final class RetryTemplate {
                 if (!shouldRetry(ex) || attempt == maxAttempts) {
                     throw toRuntimeException(ex);
                 }
-                sleep(computeBackoffMillis(attempt));
+                sleep(backoff.nextDelayMillis(attempt));
             }
         }
         throw new IllegalStateException("重试循环异常退出，理论上不可到达");
@@ -232,7 +242,7 @@ public final class RetryTemplate {
                 if (!shouldRetry(ex) || attempt == maxAttempts) {
                     throw toRuntimeException(ex);
                 }
-                sleep(computeBackoffMillis(attempt));
+                sleep(backoff.nextDelayMillis(attempt));
             }
         }
         throw new IllegalStateException("重试循环异常退出，理论上不可到达");
@@ -267,25 +277,6 @@ public final class RetryTemplate {
     }
 
     /**
-     * 计算第 attempt 次失败后的重试等待毫秒数。
-     *
-     * @param attempt 刚刚失败的尝试序号，从 1 开始
-     * @return 等待毫秒数，非负
-     */
-    private long computeBackoffMillis(int attempt) {
-        if (backoff == Backoff.NONE) {
-            return 0L;
-        }
-        if (backoff == Backoff.FIXED) {
-            return initialMillis;
-        }
-        // 指数退避：initialMillis * multiplier^(attempt-1)，以 double 计算避免 long 溢出，再用 maxMillis 封顶
-        double raw = initialMillis * Math.pow(multiplier, attempt - 1);
-        long computed = (long) Math.min(raw, (double) Long.MAX_VALUE);
-        return Math.min(computed, maxMillis);
-    }
-
-    /**
      * 重试前等待指定毫秒数。
      *
      * @param millis 等待毫秒数，非正数时直接返回
@@ -302,17 +293,5 @@ public final class RetryTemplate {
             Thread.currentThread().interrupt();
             throw new RuntimeException("重试等待被中断", ex);
         }
-    }
-
-    /**
-     * 退避策略类型。
-     */
-    private enum Backoff {
-        /** 不等待，立即重试 */
-        NONE,
-        /** 固定间隔等待 */
-        FIXED,
-        /** 指数递增间隔等待 */
-        EXPONENTIAL
     }
 }
