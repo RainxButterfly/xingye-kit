@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-net</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-net</name>
+    <description>星叶 HTTP 与远程调用：基于 HttpURLConnection 的轻量 HTTP 客户端（超时/重试/代理/上传）、令牌桶限流、熔断器</description>
+
+    <!-- 纯 Java 模块：基于 JDK HttpURLConnection，零第三方依赖 -->
+</project>

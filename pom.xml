@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.xingheyiye</groupId>
+    <artifactId>xingye-kit</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>xingye-kit</name>
+    <description>星叶工具箱 - 通用 Java 工具集：核心模块零第三方依赖，锁定 JDK 8 语法，可选 Spring Boot 自动装配</description>
+    <url>https://github.com/RainxButterfly/xingye-kit</url>
+
+    <licenses>
+        <license>
+            <name>GNU Affero General Public License v3.0</name>
+            <url>https://www.gnu.org/licenses/agpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>星河一叶 (RainxButterfly)</name>
+            <url>https://github.com/RainxButterfly</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/RainxButterfly/xingye-kit</url>
+        <connection>scm:git:https://github.com/RainxButterfly/xingye-kit.git</connection>
+        <developerConnection>scm:git:git@github.com:RainxButterfly/xingye-kit.git</developerConnection>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/RainxButterfly/xingye-kit/issues</url>
+    </issueManagement>
+
+    <properties>
+        <!-- 语法与字节码锁定 JDK 8：编译产物可在 JDK 8/11/17/21/25 上运行 -->
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- boot 模块的 Spring Boot 依赖基线：2.7.x API 与 3.x 兼容，宿主应用可用任一大版本 -->
+        <spring-boot.version>2.7.18</spring-boot.version>
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+    </properties>
+
+    <modules>
+        <module>xingye-kit-core</module>
+        <module>xingye-kit-id</module>
+        <module>xingye-kit-notify</module>
+        <module>xingye-kit-net</module>
+        <module>xingye-kit-io</module>
+        <module>xingye-kit-cache</module>
+        <module>xingye-kit-security</module>
+        <module>xingye-kit-boot</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块统一版本管理，子模块引用无需声明 version -->
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-id</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-notify</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-net</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-io</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-cache</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-boot</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- 仅 boot 模块使用；核心七模块不引入任何 Spring 依赖 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <!-- 显式硬编码 1.8（而非引用 maven.compiler.* 属性）：
+                             本机 ~/.m2/settings.xml 的激活 profile 可能以 settings 级属性覆盖 POM 属性
+                             （settings profile 属性优先级更高），显式插件配置不受其影响，
+                             确保任何构建环境下产物均为 JDK 8 字节码 -->
+                        <source>1.8</source>
+                        <target>1.8</target>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

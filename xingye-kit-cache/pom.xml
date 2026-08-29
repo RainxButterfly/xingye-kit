@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-cache</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-cache</name>
+    <description>星叶缓存：本地缓存（TTL + 近似 LRU + 定时清理）、Redis 命令抽象与分布式锁/计数器、幂等工具</description>
+
+    <!-- RedisClient 为抽象接口：使用方以 Jedis/Lettuce 适配实现，本模块零第三方依赖 -->
+</project>

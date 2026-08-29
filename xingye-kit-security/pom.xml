@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-security</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-security</name>
+    <description>星叶安全：AES-GCM 加解密与口令派生、RSA（OAEP/签名）、SHA/HMAC/PBKDF2 哈希、零依赖 JWT（HS256/384/512、RS256）、日志脱敏注解</description>
+
+    <!-- BCrypt/Argon2 可通过 PasswordHasher 接口接入第三方实现，本模块零第三方依赖 -->
+</project>

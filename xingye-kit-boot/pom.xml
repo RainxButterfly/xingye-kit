@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-boot</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-boot</name>
+    <description>星叶 Spring Boot 自动装配：注册 HttpTool/Snowflake/LocalCache/Notifier Bean，兼容 Spring Boot 2.7.x 与 3.x</description>
+
+    <dependencies>
+        <!-- 自动装配的目标模块 -->
+        <dependency>
+            <groupId>com.xingheyiye</groupId>
+            <artifactId>xingye-kit-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.xingheyiye</groupId>
+            <artifactId>xingye-kit-id</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.xingheyiye</groupId>
+            <artifactId>xingye-kit-net</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.xingheyiye</groupId>
+            <artifactId>xingye-kit-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.xingheyiye</groupId>
+            <artifactId>xingye-kit-notify</artifactId>
+        </dependency>
+        <!-- provided：运行时由宿主 Spring Boot 应用自带（2.7.x 或 3.x 任一）；
+             本模块仅在其类路径缺失时整体不生效（@ConditionalOnClass 守卫） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

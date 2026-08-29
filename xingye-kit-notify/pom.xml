@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-notify</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-notify</name>
+    <description>星叶通知通信：短信/邮件/Webhook 接口与 JDK 默认实现（钉钉/飞书/企业微信）、验证码（过期+防刷）、通知模板</description>
+
+    <!-- 接口 + 适配器设计：真实厂商接入由使用方实现接口，本模块零第三方依赖 -->
+</project>

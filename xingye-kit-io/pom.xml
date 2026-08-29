@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.xingheyiye</groupId>
+        <artifactId>xingye-kit</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>xingye-kit-io</artifactId>
+    <packaging>jar</packaging>
+
+    <name>xingye-kit-io</name>
+    <description>星叶文件与 IO：文件/ZIP（Zip-Slip 防护）/CSV（RFC 4180）工具、二维码（ZXing 运行时可选）、图片处理</description>
+
+    <!-- ZXing 为可选运行时依赖（QrCodeUtils 以反射调用，编译期零依赖）：
+         需要二维码能力时由使用方自行引入 com.google.zxing:core 与 com.google.zxing:javase -->
+</project>
