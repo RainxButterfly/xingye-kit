@@ -39,8 +39,9 @@
  *     <li>{@link com.xingheyiye.xingye.kit.notify.NotificationTemplate}：通知文案的
  *         "${key}" 占位符渲染；</li>
  *     <li>{@link com.xingheyiye.xingye.kit.notify.VerificationCode} /
- *         {@link com.xingheyiye.xingye.kit.notify.CodeStore}：验证码生成、防刷、校验与
- *         失败次数限制。</li>
+ *         {@link com.xingheyiye.xingye.kit.notify.CodeStore} /
+ *         {@link com.xingheyiye.xingye.kit.notify.CodeGenerator}：验证码生成（生成策略可插拔）、
+ *         防刷、校验与失败次数限制。</li>
  * </ul>
  *
  * <p>线程安全性：契约接口的线程安全性由实现方声明；本模块自带的

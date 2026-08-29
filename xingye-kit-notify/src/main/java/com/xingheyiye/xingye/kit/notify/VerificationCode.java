@@ -18,22 +18,29 @@
  */
 package com.xingheyiye.xingye.kit.notify;
 
-import java.security.SecureRandom;
+import com.xingheyiye.xingye.kit.notify.impl.AlphanumericCodeGenerator;
+import com.xingheyiye.xingye.kit.notify.impl.NumericCodeGenerator;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 验证码服务：生成、防刷发送间隔控制、一次性校验与失败次数限制。
  *
- * <p>一句话职责：以 {@link CodeStore} 为存储后端，完成"生成验证码 → 发送（防刷）→ 校验（防爆破）"闭环。</p>
+ * <p>一句话职责：以 {@link CodeStore} 为存储后端，以 {@link CodeGenerator} 为生成策略，
+ * 完成"生成验证码 → 发送（防刷）→ 校验（防爆破）"闭环。</p>
  *
  * <p>适用场景：手机号/邮箱注册登录验证码、敏感操作二次确认码。
  * 规则：</p>
  * <ul>
- *     <li>generate：SecureRandom 生成；同一 target 距上次生成不足 resendIntervalMillis
+ *     <li>generate：由 {@link CodeGenerator} 生成；同一 target 距上次生成不足 resendIntervalMillis
  *         抛 IllegalStateException（防刷）；生成成功会重置该 target 的失败计数；</li>
  *     <li>verify：命中即删除记录（一次性使用）；记录不存在/已过期/不匹配均返回 false 并累计
  *         失败次数，达到 maxVerifyAttempts 后删除记录并清零计数。</li>
  * </ul>
+ *
+ * <p>生成策略可插拔：默认构造使用纯数字 {@link NumericCodeGenerator}；可通过
+ * {@code numericOnly} 参数切换内置的数字/字母数字策略，或直接注入自定义
+ * {@link CodeGenerator}（如防歧义字符集、避免连续重复字符等）。</p>
  *
  * <p>线程安全性：验证码本体经 {@link CodeStore} 存取（其线程安全性由实现保证）；
  * 发送间隔时间戳与失败计数保存在类内 {@link ConcurrentHashMap}，防刷判断在锁内完成
@@ -54,16 +61,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class VerificationCode {
 
-    /** 安全随机数发生器（SecureRandom 自身线程安全，作为静态常量共享） */
-    private static final SecureRandom RANDOM = new SecureRandom();
-
-    /** 数字字符集：numericOnly=true 时使用 */
-    private static final char[] DIGITS = "0123456789".toCharArray();
-
-    /** 数字 + 小写字母 + 大写字母字符集：numericOnly=false 时使用 */
-    private static final char[] ALPHANUMERIC =
-            "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
-
     /** 验证码在 CodeStore 中的键前缀，避免与其它业务键冲突 */
     private static final String KEY_PREFIX = "vcode:";
 
@@ -73,8 +70,8 @@ public class VerificationCode {
     /** 验证码长度（字符个数） */
     private final int codeLength;
 
-    /** true 表示仅生成数字验证码，false 表示数字 + 大小写字母混合 */
-    private final boolean numericOnly;
+    /** 验证码生成策略（决定字符集与生成算法），恒非 null */
+    private final CodeGenerator codeGenerator;
 
     /** 验证码有效期（毫秒），写入 CodeStore 的 TTL */
     private final long expireMillis;
@@ -102,7 +99,9 @@ public class VerificationCode {
     }
 
     /**
-     * 完整构造。
+     * 完整构造，生成策略通过 {@code numericOnly} 选择内置实现：
+     * {@code true} 使用纯数字 {@link NumericCodeGenerator}，
+     * {@code false} 使用数字 + 大小写字母 {@link AlphanumericCodeGenerator}。
      *
      * @param store 验证码存储后端，不能为 null
      * @param codeLength 验证码长度，必须大于 0
@@ -114,11 +113,32 @@ public class VerificationCode {
      */
     public VerificationCode(CodeStore store, int codeLength, boolean numericOnly, long expireMillis,
                             long resendIntervalMillis, int maxVerifyAttempts) {
+        this(store, codeLength,
+                numericOnly ? new NumericCodeGenerator() : new AlphanumericCodeGenerator(),
+                expireMillis, resendIntervalMillis, maxVerifyAttempts);
+    }
+
+    /**
+     * 完整构造，注入自定义 {@link CodeGenerator} 生成策略（如防歧义字符集、避免连续重复字符等）。
+     *
+     * @param store 验证码存储后端，不能为 null
+     * @param codeLength 验证码长度，必须大于 0
+     * @param codeGenerator 验证码生成策略，不能为 null
+     * @param expireMillis 验证码有效期（毫秒），必须大于 0
+     * @param resendIntervalMillis 同一目标两次生成的最小间隔（毫秒），不能为负数；0 表示不做间隔限制
+     * @param maxVerifyAttempts 同一目标最大校验失败次数，必须大于 0；达到后删除记录要求重新生成
+     * @throws IllegalArgumentException 任一参数不满足上述约束时抛出
+     */
+    public VerificationCode(CodeStore store, int codeLength, CodeGenerator codeGenerator, long expireMillis,
+                            long resendIntervalMillis, int maxVerifyAttempts) {
         if (store == null) {
             throw new IllegalArgumentException("store 不能为 null");
         }
         if (codeLength <= 0) {
             throw new IllegalArgumentException("codeLength 必须大于 0");
+        }
+        if (codeGenerator == null) {
+            throw new IllegalArgumentException("codeGenerator 不能为 null");
         }
         if (expireMillis <= 0) {
             throw new IllegalArgumentException("expireMillis 必须大于 0，单位毫秒");
@@ -131,7 +151,7 @@ public class VerificationCode {
         }
         this.store = store;
         this.codeLength = codeLength;
-        this.numericOnly = numericOnly;
+        this.codeGenerator = codeGenerator;
         this.expireMillis = expireMillis;
         this.resendIntervalMillis = resendIntervalMillis;
         this.maxVerifyAttempts = maxVerifyAttempts;
@@ -146,8 +166,8 @@ public class VerificationCode {
      * 切勿将验证码明文写入日志。</p>
      *
      * @param target 验证码接收目标（如手机号、邮箱），不能为 null 或空白串
-     * @return 生成的验证码明文，不会为 null；numericOnly=true 时为纯数字串，
-     *         false 时为数字 + 大小写字母混合串，长度等于构造时的 codeLength
+     * @return 生成的验证码明文，不会为 null；字符集与长度由构造时注入的
+     *         {@link CodeGenerator} 决定
      * @throws IllegalArgumentException target 为 null 或空白串时抛出
      * @throws IllegalStateException 同一 target 距上次生成小于 resendIntervalMillis 时抛出（防刷）
      * @throws RuntimeException CodeStore 写入失败等存储故障时抛出
@@ -163,7 +183,7 @@ public class VerificationCode {
             }
             lastSendTimes.put(target, now);
         }
-        String code = randomCode();
+        String code = codeGenerator.generate(codeLength);
         store.put(KEY_PREFIX + target, code, expireMillis);
         verifyFailures.remove(target);
         return code;
@@ -196,20 +216,6 @@ public class VerificationCode {
             verifyFailures.remove(target);
         }
         return false;
-    }
-
-    /**
-     * 生成随机验证码。
-     *
-     * @return 长度为 codeLength 的验证码串，不会为 null
-     */
-    private String randomCode() {
-        char[] alphabet = numericOnly ? DIGITS : ALPHANUMERIC;
-        char[] code = new char[codeLength];
-        for (int i = 0; i < codeLength; i++) {
-            code[i] = alphabet[RANDOM.nextInt(alphabet.length)];
-        }
-        return new String(code);
     }
 
     /**
