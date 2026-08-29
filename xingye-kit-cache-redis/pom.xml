@@ -10,19 +10,22 @@
         <version>1.0.0</version>
     </parent>
 
-    <artifactId>xingye-kit-notify</artifactId>
+    <artifactId>xingye-kit-cache-redis</artifactId>
     <packaging>jar</packaging>
 
-    <name>xingye-kit-notify</name>
-    <description>星叶通知通信：短信/邮件/Webhook 接口与 JDK 默认实现（钉钉/飞书/企业微信）、验证码（过期+防刷）、通知模板</description>
+    <name>xingye-kit-cache-redis</name>
+    <description>星叶缓存-Redis 适配：以 Jedis 连接池实现 cache 模块 RedisClient 契约，提供真实 Redis 分布式锁/计数/验证码存储</description>
 
     <dependencies>
-        <!-- 依赖 cache 仅用于 RedisClient 抽象：供 RedisCodeStore 使用；仍为零第三方依赖 -->
         <dependency>
             <groupId>com.xingheyiye</groupId>
             <artifactId>xingye-kit-cache</artifactId>
         </dependency>
+        <!-- Jedis 4.x（Java 8 兼容），仅本适配模块引入，核心模块仍零第三方依赖 -->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>4.4.3</version>
+        </dependency>
     </dependencies>
-
-    <!-- 接口 + 适配器设计：真实厂商接入由使用方实现接口，本模块零第三方依赖 -->
 </project>

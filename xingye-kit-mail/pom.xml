@@ -10,19 +10,22 @@
         <version>1.0.0</version>
     </parent>
 
-    <artifactId>xingye-kit-notify</artifactId>
+    <artifactId>xingye-kit-mail</artifactId>
     <packaging>jar</packaging>
 
-    <name>xingye-kit-notify</name>
-    <description>星叶通知通信：短信/邮件/Webhook 接口与 JDK 默认实现（钉钉/飞书/企业微信）、验证码（过期+防刷）、通知模板</description>
+    <name>xingye-kit-mail</name>
+    <description>星叶邮件适配：以 JavaMail(SMTP) 实现 notify 模块 MailClient 契约，真实发送文本/HTML/带附件邮件</description>
 
     <dependencies>
-        <!-- 依赖 cache 仅用于 RedisClient 抽象：供 RedisCodeStore 使用；仍为零第三方依赖 -->
         <dependency>
             <groupId>com.xingheyiye</groupId>
-            <artifactId>xingye-kit-cache</artifactId>
+            <artifactId>xingye-kit-notify</artifactId>
+        </dependency>
+        <!-- JavaMail 1.6.2（javax.mail 命名空间，JDK 8 兼容，含 SMTP 实现），仅本适配模块引入 -->
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+            <version>1.6.2</version>
         </dependency>
     </dependencies>
-
-    <!-- 接口 + 适配器设计：真实厂商接入由使用方实现接口，本模块零第三方依赖 -->
 </project>

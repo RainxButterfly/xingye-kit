@@ -59,6 +59,9 @@
         <module>xingye-kit-cache</module>
         <module>xingye-kit-security</module>
         <module>xingye-kit-boot</module>
+        <module>xingye-kit-sms-aliyun</module>
+        <module>xingye-kit-mail</module>
+        <module>xingye-kit-cache-redis</module>
     </modules>
 
     <dependencyManagement>
@@ -102,6 +105,21 @@
             <dependency>
                 <groupId>com.xingheyiye</groupId>
                 <artifactId>xingye-kit-boot</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-sms-aliyun</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-mail</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.xingheyiye</groupId>
+                <artifactId>xingye-kit-cache-redis</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- 仅 boot 模块使用；核心七模块不引入任何 Spring 依赖 -->
