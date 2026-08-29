@@ -230,7 +230,7 @@ LocalCache<String, User> cache = LocalCache.<String, User>newBuilder()
         .build();
 User user = cache.get("user:1001", key -> loadUser(key));
 
-// 分布式锁 / 计数（RedisClient 由 Jedis/Lettuce 适配实现）
+// 分布式锁 / 计数（RedisClient 由 Jedis/Lettuce/Redisson 适配实现）
 RedisHelper redis = new RedisHelper(myRedisClient, "app1");
 if (redis.tryLock("order:1001", "worker-07", 30000)) {
     try { /* 临界区 */ } finally { redis.unlock("order:1001", "worker-07"); }

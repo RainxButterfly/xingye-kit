@@ -27,7 +27,7 @@
  *     <li>{@link com.xingheyiye.xingye.kit.cache.LocalCache}：单实例热点数据缓存、字典/配置缓存、
  *         通过 loader 回源防击穿；</li>
  *     <li>{@link com.xingheyiye.xingye.kit.cache.RedisClient} /
- *         {@link com.xingheyiye.xingye.kit.cache.RedisHelper}：由使用方以 Jedis/Lettuce 适配
+ *         {@link com.xingheyiye.xingye.kit.cache.RedisHelper}：由使用方以 Jedis/Lettuce/Redisson 适配
  *         {@code RedisClient} 后，获得分布式锁、窗口计数等轻量封装；</li>
  *     <li>{@link com.xingheyiye.xingye.kit.cache.Idempotent} /
  *         {@link com.xingheyiye.xingye.kit.cache.IdempotentStore}：支付、下单等写接口的防重复提交。</li>
