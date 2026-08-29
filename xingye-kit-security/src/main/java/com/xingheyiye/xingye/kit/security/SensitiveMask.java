@@ -26,6 +26,10 @@ import java.lang.reflect.Modifier;
  *
  * <p>一句话职责：把"手机号/身份证/邮箱/姓名/银行卡/地址"等敏感值替换为保留少量明文的等长掩码串。</p>
  *
+ * <p>内置选择：{@link SensitiveType} 提供手机号/身份证/邮箱/姓名/银行卡/地址 6 种常用脱敏规则；
+ * 需要自定义规则（车牌、IPv6、正则等）时，实现 {@link MaskingStrategy} 接口并调用
+ * {@link #mask(String, MaskingStrategy)} 即可。</p>
+ *
  * <p>适用场景：日志打印前的对象净化、对外接口 VO 的敏感字段处理、客服系统展示。</p>
  *
  * <p>线程安全性：全静态方法且无共享可变状态，线程安全。
@@ -102,6 +106,23 @@ public final class SensitiveMask {
                 // 枚举已穷举，理论上不可达；保留兜底避免新增枚举值时静默泄露原值
                 return stars(value.length());
         }
+    }
+
+    /**
+     * 按自定义策略脱敏字符串（内置 6 种 {@link SensitiveType} 之外的自定义规则入口）。
+     *
+     * <p>null 与空串的原样返回、掩码长度等约定由策略实现方负责（建议与原文等长）。</p>
+     *
+     * @param value 原始值，可为 null 或空串（此时原样返回，取决于策略实现）
+     * @param strategy 自定义脱敏策略，不能为 null
+     * @return 脱敏后的字符串，不会为 null（入参为 null 且策略遵循约定时返回 null）
+     * @throws IllegalArgumentException strategy 为 null 时抛出
+     */
+    public static String mask(String value, MaskingStrategy strategy) {
+        if (strategy == null) {
+            throw new IllegalArgumentException("strategy 不能为 null");
+        }
+        return strategy.mask(value);
     }
 
     /**
