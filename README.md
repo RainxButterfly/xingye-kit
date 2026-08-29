@@ -65,7 +65,42 @@
 
 ### 1. 引入依赖
 
-**方式 A：安装到本地仓库 / 私服**
+**方式 A：JitPack 在线引入（推荐，免克隆源码）**
+
+第一步，在 `pom.xml` 中添加 JitPack 仓库：
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+```
+
+第二步，按需添加依赖。引入全部模块（JitPack 会自动生成聚合坐标）：
+
+```xml
+<dependency>
+    <groupId>com.github.RainxButterfly</groupId>
+    <artifactId>xingye-kit</artifactId>
+    <version>v1.0.0</version>
+</dependency>
+```
+
+或者只引入单个模块（groupId 规则为 `com.github.用户名.仓库名`，artifactId 与上方模块总览表一致）：
+
+```xml
+<dependency>
+    <groupId>com.github.RainxButterfly.xingye-kit</groupId>
+    <artifactId>xingye-kit-core</artifactId>
+    <version>v1.0.0</version>
+</dependency>
+```
+
+> 版本号对应 GitHub 的 Tag：先在仓库打 tag（如 `v1.0.0`），首次引入时 JitPack 自动拉取构建，约需 1~2 分钟。聚合坐标会引入全部 8 个模块（`boot` 的 Spring 依赖为 `provided`，不会传递引入，不影响非 Spring 项目）。
+
+**方式 B：源码构建安装到本地仓库 / 私服**
 
 ```bash
 git clone https://github.com/RainxButterfly/xingye-kit.git
@@ -73,7 +108,7 @@ cd xingye-kit
 mvn clean install
 ```
 
-**方式 B：直接在项目中按需引入**
+**方式 C：安装后按 `com.xingheyiye` 坐标引入**
 
 ```xml
 <dependency>
