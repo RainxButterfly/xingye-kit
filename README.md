@@ -10,7 +10,7 @@
 [![Maven](https://img.shields.io/badge/Maven-3.6%2B-c71a36.svg)](https://maven.apache.org/)
 [![License: AGPL v3.0](https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
 
-<div>
+</div>
 
 ---
 
@@ -156,21 +156,28 @@ String data = RetryTemplate.create()
 ### id —— 雪花 ID / 短码 / 流水号
 
 ```java
-Snowflake snowflake = new Snowflake(1, 1);          // workerId, datacenterId（位宽可配，时钟回拨自愈）
+// workerId, datacenterId（位宽可配，时钟回拨自愈）
+Snowflake snowflake = new Snowflake(1, 1);
 long id = snowflake.nextLongId();
-long bornAt = Snowflake.extractTimestamp(id);        // 反解生成时间
 
-UuidUtils.ordered();                                 // 趋势有序 UUID，适合做 MySQL 主键
-ShortCode.randomUnambiguous(8);                      // 防歧义字符短码（剔除 0/O/1/l/I）
+// 反解生成时间
+long bornAt = Snowflake.extractTimestamp(id);
 
+// 趋势有序 UUID，适合做 MySQL 主键
+UuidUtils.ordered();
+
+// 防歧义字符短码（剔除 0/O/1/l/I）
+ShortCode.randomUnambiguous(8);
+
+// 时间串 + 节点 + 序列，如 260830101530123 + 07 + 0001
 RequestNo requestNo = RequestNo.builder().node("07").build();
-String no = requestNo.next();                        // 260830101530123 + 07 + 0001
+String no = requestNo.next();
 ```
 
 ### net —— HTTP / 限流 / 熔断
 
 ```java
-// POST JSON + 超时 + 代理
+// POST JSON + 超时
 HttpResponse resp = HttpTool.send(HttpRequest.post("https://api.example.com/orders")
         .bearerToken(token)
         .json("{\"skuId\": 1001}")
@@ -203,8 +210,8 @@ if (breaker.allowRequest()) {
 // 验证码：60s 有效、60s 防重发、错 5 次作废
 VerificationCode code = new VerificationCode(new InMemoryCodeStore());
 String target = "13800138000";
-code.generate(target);                               // 内部生成并存储，60s 内重复生成抛 IllegalStateException
-boolean ok = code.verify(target, userInput);         // 一次性校验
+code.generate(target);   // 内部生成并存储，60s 内重复生成抛 IllegalStateException
+boolean ok = code.verify(target, userInput);   // 一次性校验
 
 // 钉钉机器人
 WebhookClient dingTalk = new DingTalkWebhookClient("https://oapi.dingtalk.com/robot/send?access_token=xxx");
@@ -227,7 +234,8 @@ RedisHelper redis = new RedisHelper(myRedisClient, "app1");
 if (redis.tryLock("order:1001", "worker-07", 30000)) {
     try { /* 临界区 */ } finally { redis.unlock("order:1001", "worker-07"); }
 }
-long count = redis.nextCount("api:/pay", 60000);     // 60s 固定窗口计数
+// 60s 固定窗口计数
+long count = redis.nextCount("api:/pay", 60000);
 
 // 幂等：请求号去重
 Idempotent idempotent = new Idempotent(new MemoryIdempotentStore());
@@ -240,7 +248,7 @@ if (!idempotent.tryBegin(requestNo, 30000)) { return Result.fail(40901, "重复�
 ```java
 // 口令派生 AES-GCM（salt|iv|密文 一段 Base64）
 String cipher = AESUtils.encryptWithPassword(password, "机密数据");
-String plain  = AESUtils.decryptWithPassword(password, cipher);
+String plain = AESUtils.decryptWithPassword(password, cipher);
 
 // 零依赖 JWT
 String token = JwtWrapper.create()
@@ -257,8 +265,8 @@ boolean valid = hasher.verify("raw-password", stored);
 
 // 日志脱敏：实体字段标注 @Sensitive
 public class UserVO {
-    @Sensitive(SensitiveType.PHONE)     private String phone;      // 138****8000
-    @Sensitive(SensitiveType.ID_CARD)   private String idCard;     // 330***********1234
+    @Sensitive(SensitiveType.PHONE) private String phone;   // 138****8000
+    @Sensitive(SensitiveType.ID_CARD) private String idCard;   // 330***********1234
     @Sensitive(SensitiveType.BANK_CARD) private String bankCard;   // 6222************5678
 }
 log.info("user={}", SensitiveMask.maskObject(userVO));
@@ -267,11 +275,13 @@ log.info("user={}", SensitiveMask.maskObject(userVO));
 ### io —— ZIP / CSV / 二维码
 
 ```java
-ZipUtils.unzip(uploadFile, targetDir);               // 内置 Zip-Slip 路径穿越防护
+// 内置 Zip-Slip 路径穿越防护
+ZipUtils.unzip(uploadFile, targetDir);
 
 try (CsvWriter writer = new CsvWriter(new File("users.csv"), StandardCharsets.UTF_8)) {
     writer.writeHeader("id", "name", "memo");
-    writer.writeRow("1", "星叶", "含,逗号 \"引号\"\n换行");   // 自动 RFC 4180 转义
+    // 含逗号/引号/换行的字段自动 RFC 4180 转义
+    writer.writeRow("1", "星叶", "含,逗号 \"引号\"\n换行");
 }
 
 // 二维码：ZXing 为运行时可选依赖（反射调用），不引入则 available() == false
@@ -323,7 +333,7 @@ if (QrCodeUtils.available()) {
 ## 构建
 
 ```bash
-# 完整构建（跳过无测试模块，产物为各模块 jar）
+# 完整构建（产物为各模块 jar）
 mvn clean package
 
 # 安装到本地仓库
@@ -336,30 +346,31 @@ mvn clean install
 
 ```
 xingye-kit
-├── pom.xml                                # 父 POM（packaging=pom，统一版本与编译配置）
+├── pom.xml
+│   (父 POM：packaging=pom，统一版本与编译配置)
 ├── xingye-kit-core
 │   └── src/main/java/com/xingheyiye/xingye/kit/core
 ├── xingye-kit-id
 │   └── src/main/java/com/xingheyiye/xingye/kit/id
-│       └── impl                           # IdGenerator 适配实现
+│       └── impl (IdGenerator 适配实现)
 ├── xingye-kit-notify
 │   └── src/main/java/com/xingheyiye/xingye/kit/notify
-│       └── impl                           # JDK 默认实现 + 钉钉/飞书/企微 Webhook
+│       └── impl (JDK 默认实现 + 钉钉/飞书/企微 Webhook)
 ├── xingye-kit-net
 │   └── src/main/java/com/xingheyiye/xingye/kit/net
 ├── xingye-kit-io
 │   └── src/main/java/com/xingheyiye/xingye/kit/io
 ├── xingye-kit-cache
 │   └── src/main/java/com/xingheyiye/xingye/kit/cache
-│       └── impl                           # 内存幂等存储
+│       └── impl (内存幂等存储)
 ├── xingye-kit-security
 │   └── src/main/java/com/xingheyiye/xingye/kit/security
-│       └── impl                           # PBKDF2 密码哈希
+│       └── impl (PBKDF2 密码哈希)
 └── xingye-kit-boot
     ├── src/main/java/com/xingheyiye/xingye/kit/boot
     └── src/main/resources/META-INF
-        ├── spring.factories                                   # Boot 2.7 注册
-        └── spring/org.springframework...AutoConfiguration.imports  # Boot 2.7+/3.x 注册
+        ├── spring.factories (Boot 2.7 注册)
+        └── spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports (Boot 2.7+/3.x 注册)
 ```
 
 每个模块的包内均含 `package-info.java` 说明模块用途；每个类的 Javadoc 含职责、适用场景、线程安全性声明与 `@code` 使用示例，可直接当文档读。
@@ -390,6 +401,7 @@ xingye-kit
 ---
 
 <div align="center">
+
 **星叶工具箱** · 由 [星河一叶 (RainxButterfly)](https://github.com/RainxButterfly) 维护
 
 如果这个项目对你有帮助，欢迎 Star ⭐ 支持
